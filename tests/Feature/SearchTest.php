@@ -77,7 +77,7 @@ it('uses the database engine unless told otherwise, and answers from the index f
     app(SearchIndexRegistry::class)->register($index);
 
     expect(app(SearchEngines::class)->engine())->toBeInstanceOf(DatabaseEngine::class)
-        ->and(app(SearchEngines::class)->names())->toBe(['database', 'array'])
+        ->and(app(SearchEngines::class)->names())->toBe(['database', 'array', 'meilisearch'])
         ->and(app(Search::class)->search('users', new SearchQuery('x'))->ids())->toBe([99])
         ->and($index->fallbackCalls)->toBe(1)
         ->and(app(SearchEngines::class)->engine('database')->stats($index->definition()))->toBeNull()

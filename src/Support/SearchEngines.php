@@ -8,6 +8,7 @@ use Closure;
 use Filagora\Search\Contracts\SearchEngine;
 use Filagora\Search\Engines\ArrayEngine;
 use Filagora\Search\Engines\DatabaseEngine;
+use Filagora\Search\Engines\MeilisearchEngine;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 
@@ -27,6 +28,7 @@ final class SearchEngines
     {
         $this->factories['database'] = static fn (Container $c): SearchEngine => new DatabaseEngine($c->make(SearchIndexRegistry::class));
         $this->factories['array'] = static fn (): SearchEngine => new ArrayEngine;
+        $this->factories['meilisearch'] = static fn (): SearchEngine => MeilisearchEngine::fromConfig();
     }
 
     /**

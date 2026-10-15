@@ -12,6 +12,8 @@ database:
 use_dns_when_possible: true
 composer_version: "2"
 web_environment:
+    - MEILISEARCH_HOST=http://meilisearch:7700
+    - MEILISEARCH_KEY=testing-master-key
     - DB_HOST=db
     - DB_PORT=3306
     - DB_USERNAME=db
