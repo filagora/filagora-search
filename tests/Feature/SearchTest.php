@@ -185,3 +185,41 @@ it('ranks by how early in the searchable fields the words match, then by id', fu
         ->and($engine->stats($index)?->documents)->toBe(4)
         ->and($engine->stats(new IndexDefinition('unknown', ['x'])))->toBeNull();
 });
+
+it('breaks ties by id however the documents were added', function () {
+    $engine = new ArrayEngine;
+    $index = new IndexDefinition('t', ['title']);
+    $engine->index($index, [new Document(3, ['title' => 'a']), new Document(1, ['title' => 'a']), new Document(2, ['title' => 'a'])]);
+
+    expect($engine->search($index, new SearchQuery('a'))->ids())->toBe([1, 2, 3])
+        ->and($engine->search($index, new SearchQuery)->ids())->toBe([1, 2, 3]);
+});
+
+it('lets an error from the database engine through, without opening the circuit or asking twice', function () {
+    $index = new class extends FakeIndex
+    {
+        public function fallback(SearchQuery $query): SearchResult
+        {
+            $this->fallbackCalls++;
+
+            throw new RuntimeException('database down');
+        }
+    };
+    app(SearchIndexRegistry::class)->register($index);
+
+    expect(fn () => app(Search::class)->search('users', new SearchQuery('x')))->toThrow(RuntimeException::class, 'database down')
+        ->and($index->fallbackCalls)->toBe(1)
+        ->and(app(CircuitBreaker::class)->isOpen())->toBeFalse();
+});
+
+it('replaces an engine registered again under the same name', function () {
+    $engines = app(SearchEngines::class);
+    $first = new ArrayEngine;
+    $second = new ArrayEngine;
+
+    $engines->extend('mine', fn () => $first);
+    expect($engines->engine('mine'))->toBe($first);
+
+    $engines->extend('mine', fn () => $second);
+    expect($engines->engine('mine'))->toBe($second);
+});
