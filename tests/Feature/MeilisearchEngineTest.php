@@ -56,15 +56,16 @@ foreach (EngineConformance::checks($engine, $engine->waitForTasks(...)) as $name
 }
 
 it('creates the index with its settings and reports its stats', function () {
+    $uid = 'things_'.uniqid();
     $engine = meilisearch('stats_');
-    $index = new IndexDefinition('things', ['title'], ['kind'], ['price'], ['paypal' => ['pay pal']]);
+    $index = new IndexDefinition($uid, ['title'], ['kind'], ['price'], ['paypal' => ['pay pal']]);
 
     $engine->syncSettings($index);
     $engine->index($index, [new Document(1, ['title' => 'a', 'kind' => 'x', 'price' => 1]), new Document('b-2', ['title' => 'b', 'kind' => 'y', 'price' => 2])]);
     $engine->waitForTasks();
 
     $stats = $engine->stats($index);
-    $settings = Http::withToken((string) getenv('MEILISEARCH_KEY'))->get(meilisearchHost().'/indexes/stats_things/settings')->json();
+    $settings = Http::withToken((string) getenv('MEILISEARCH_KEY'))->get(meilisearchHost()."/indexes/stats_{$uid}/settings")->json();
 
     expect($stats?->documents)->toBe(2)->and($stats->recentFailures)->toBe(0)
         ->and($settings['searchableAttributes'])->toBe(['title'])
@@ -165,4 +166,65 @@ it('is available by name from the configuration', function () {
     config(['filagora-search.meilisearch.host' => 'http://example.invalid:7700', 'filagora-search.meilisearch.prefix' => 'p_']);
 
     expect(app(SearchEngines::class)->engine('meilisearch'))->toBeInstanceOf(MeilisearchEngine::class);
+});
+
+it('creates a new index with the definition\'s primary key', function () {
+    $index = new IndexDefinition('keyed_'.uniqid(), ['title'], primaryKey: 'sku');
+
+    meilisearch('pk_')->syncSettings($index);
+
+    $created = Http::withToken((string) getenv('MEILISEARCH_KEY'))->get(meilisearchHost().'/indexes/pk_'.$index->name)->json();
+    expect($created['primaryKey'])->toBe('sku');
+});
+
+it('reports a task that was cancelled as failed', function () {
+    Http::fake(['*/tasks/*' => Http::response(['status' => 'canceled'])]);
+
+    expect(fn () => meilisearch()->waitForTask(3))->toThrow(MeilisearchTaskFailed::class, 'canceled');
+});
+
+it('sends nothing for an empty batch of documents or ids', function () {
+    Http::fake();
+    $engine = meilisearch();
+    $index = EngineConformance::definition();
+
+    $engine->index($index, []);
+    $engine->remove($index, []);
+
+    Http::assertNothingSent();
+});
+
+it('sends a document\'s vectors under the default embedder', function () {
+    Http::fake(['*' => Http::response(['taskUid' => 5], 202)]);
+    $index = EngineConformance::definition();
+
+    meilisearch()->index($index, [new Document(1, ['title' => 'x'], [0.1, 0.2]), new Document(2, ['title' => 'y'])]);
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), '/documents') && $request->data() === [
+        ['title' => 'x', 'id' => 1, '_vectors' => ['default' => [0.1, 0.2]]],
+        ['title' => 'y', 'id' => 2],
+    ]);
+});
+
+it('waits for each change only once', function () {
+    $engine = meilisearch();
+    $index = new IndexDefinition('wait_'.uniqid(), ['title']);
+    $engine->syncSettings($index);
+    $engine->index($index, [new Document(1, ['title' => 'x'])]);
+    $engine->waitForTasks();
+
+    Http::fake(['*/tasks/*' => Http::response(['status' => 'failed', 'error' => ['message' => 'late']])]);
+
+    $engine->waitForTasks();
+    expect(true)->toBeTrue();
+});
+
+it('counts indexing tasks that failed recently', function () {
+    $engine = meilisearch('fail_');
+    $index = new IndexDefinition('failing_'.uniqid(), ['title']);
+    $engine->syncSettings($index);
+    $engine->index($index, [new Document('not a valid id!', ['title' => 'x'])]);
+
+    expect(fn () => $engine->waitForTasks())->toThrow(MeilisearchTaskFailed::class)
+        ->and($engine->stats($index)?->recentFailures)->toBe(1);
 });
