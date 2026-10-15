@@ -11,6 +11,8 @@ permissions:
 jobs:
   tests:
     uses: filagora/filagora-shared/.github/workflows/tests.yml@master
+    with:
+      meilisearch-version: '1.16'
 
   lint:
     uses: filagora/filagora-shared/.github/workflows/lint.yml@master
