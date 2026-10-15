@@ -237,3 +237,63 @@ it('reports recent failed tasks as a health problem', function () {
 
     expect(app(HealthChecker::class)->problems())->toBe(['Index `users`: 2 indexing task(s) failed in the last 24 hours.']);
 });
+
+it('uses a batch size of at least one', function () {
+    $engine = withArrayEngine();
+    TestUser::make('One');
+    TestUser::make('Two');
+    $engine->flush((new UserIndex)->definition());
+
+    expect(app(Indexer::class)->reindex(new UserIndex, batchSize: 0))->toBe(2);
+});
+
+it('syncs on the sync connection unless the queue is on', function () {
+    withArrayEngine();
+    Queue::fake();
+    config(['filagora-search.after_commit' => false, 'filagora-search.queue' => false]);
+    TestUser::make('Inline');
+    Queue::assertPushed(SyncSearchDocument::class, fn ($job) => $job->connection === 'sync');
+
+    Queue::fake();
+    config(['filagora-search.queue' => true]);
+    TestUser::make('Later');
+    Queue::assertPushed(SyncSearchDocument::class, fn ($job) => $job->connection === null);
+});
+
+it('finds a row that a global scope would hide from ordinary queries', function () {
+    $engine = withArrayEngine();
+    TestUser::addGlobalScope('hide-scoped', fn ($query) => config('test.hide_scoped') ? $query->where('name', '!=', 'Scoped') : $query);
+    config(['test.hide_scoped' => true]);
+
+    $user = TestUser::make('Scoped');
+
+    expect(indexed($engine, 'scoped'))->toBe([$user->id]);
+});
+
+it('has no health problems to report with the database engine, even for an index it cannot count', function () {
+    app(SearchIndexRegistry::class)->register(new UserIndex);
+
+    expect(app(HealthChecker::class)->problems())->toBe([]);
+});
+
+it('applies the settings first when reindexing with --sync-settings', function () {
+    $calls = [];
+    $engine = new class($calls) extends ArrayEngine
+    {
+        public function __construct(public array &$calls) {}
+
+        public function syncSettings(IndexDefinition $index): void
+        {
+            $this->calls[] = 'settings';
+            parent::syncSettings($index);
+        }
+    };
+    withArrayEngine($engine);
+    $calls = [];
+
+    $this->artisan('filagora:search:reindex')->assertExitCode(0);
+    expect($calls)->toBe([]);
+
+    $this->artisan('filagora:search:reindex', ['--sync-settings' => true])->assertExitCode(0);
+    expect($calls)->toBe(['settings']);
+});
