@@ -19,6 +19,23 @@ fresh and healthy with commands. Requires [`filagora/filagora-core`](https://git
   database for `circuit.cooldown_seconds` and the failure is logged.
 - **Filters** are engine-neutral: `new All(new Equals('forum_id', 3), new Range('reply_count', gte: 2))`.
 
+## Keeping the index fresh
+
+Saving, deleting or restoring a model that belongs to a registered index updates its document
+(after the transaction commits). Set `FILAGORA_SEARCH_QUEUE=true` to do that on the queue. Failures
+are logged and never break the save.
+
+```bash
+php artisan filagora:search:sync-settings            # create indexes and apply their settings
+php artisan filagora:search:reindex --flush          # send every searchable row
+php artisan filagora:search:reindex --index=threads --from-id=5000 --batch-size=200 --sleep-ms=50
+php artisan filagora:search:backfill threads filters # one field group, as partial updates
+php artisan filagora:search:check-health             # counts and failed tasks; non-zero on a problem
+```
+
+`filagora:doctor` also reports the engine's health. With the `database` engine all of these say
+there is nothing to do.
+
 ## Using Meilisearch
 
 ```env
