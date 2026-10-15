@@ -19,6 +19,20 @@ fresh and healthy with commands. Requires [`filagora/filagora-core`](https://git
   database for `circuit.cooldown_seconds` and the failure is logged.
 - **Filters** are engine-neutral: `new All(new Equals('forum_id', 3), new Range('reply_count', gte: 2))`.
 
+## Using Meilisearch
+
+```env
+FILAGORA_SEARCH_ENGINE=meilisearch
+MEILISEARCH_HOST=http://localhost:7700
+MEILISEARCH_KEY=your-key
+```
+
+The engine speaks Meilisearch's HTTP API directly. Changes are applied by Meilisearch after it
+has answered, so a failure shows up as a failed *task*; `syncSettings()` waits for its own tasks and
+`MeilisearchEngine::waitForTasks()` waits for the rest. Every word of a query must match, and a
+total that reaches `meilisearch.max_total_hits` (1000, Meilisearch's counting limit) is reported with
+`totalIsCapped`.
+
 ## Writing an engine
 
 Implement `Filagora\Search\Contracts\SearchEngine`, register it, and run the conformance checks in
