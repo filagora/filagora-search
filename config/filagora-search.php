@@ -18,6 +18,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Keeping the index fresh
+    |--------------------------------------------------------------------------
+    |
+    | `queue`: send changes to the engine on the queue instead of during the request.
+    | `after_commit`: wait for the surrounding database transaction to commit first, so a
+    | rolled-back write never reaches the index. `chunk_size`: rows per batch when reindexing.
+    |
+    */
+    'queue' => env('FILAGORA_SEARCH_QUEUE', false),
+    'after_commit' => true,
+    'chunk_size' => 500,
+
+    /*
+    |--------------------------------------------------------------------------
     | Circuit breaker
     |--------------------------------------------------------------------------
     |

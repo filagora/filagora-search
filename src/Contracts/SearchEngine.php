@@ -33,6 +33,14 @@ interface SearchEngine
     public function index(IndexDefinition $index, iterable $documents): void;
 
     /**
+     * Merge these fields into the documents with these ids, keeping the fields not given; a
+     * document that is not there yet is created from what is given.
+     *
+     * @param  iterable<Document>  $documents
+     */
+    public function update(IndexDefinition $index, iterable $documents): void;
+
+    /**
      * @param  iterable<int|string>  $ids
      */
     public function remove(IndexDefinition $index, iterable $ids): void;

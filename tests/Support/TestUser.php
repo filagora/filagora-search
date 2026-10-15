@@ -16,11 +16,11 @@ class TestUser extends Authenticatable implements MustVerifyEmail
 
     protected $guarded = [];
 
-    public static function make(string $name = 'User'): self
+    public static function make(string $name = 'User', ?string $email = null): self
     {
         return self::create([
             'name' => $name,
-            'email' => strtolower($name).uniqid().'@example.test',
+            'email' => $email ?? strtolower($name).uniqid().'@example.test',
             'password' => 'x',
             'email_verified_at' => now(),
         ]);
