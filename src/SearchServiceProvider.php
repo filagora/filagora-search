@@ -6,6 +6,9 @@ namespace Filagora\Search;
 
 use Filagora\Core\Modules\Module;
 use Filagora\Core\Modules\ModuleRegistry;
+use Filagora\Search\Support\CircuitBreaker;
+use Filagora\Search\Support\SearchEngines;
+use Filagora\Search\Support\SearchIndexRegistry;
 use Illuminate\Support\ServiceProvider;
 
 class SearchServiceProvider extends ServiceProvider
@@ -13,6 +16,11 @@ class SearchServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/filagora-search.php', 'filagora-search');
+
+        $this->app->singleton(SearchIndexRegistry::class);
+        $this->app->singleton(SearchEngines::class, fn ($app): SearchEngines => new SearchEngines($app));
+        $this->app->singleton(CircuitBreaker::class);
+        $this->app->singleton(Search::class);
     }
 
     public function boot(): void
