@@ -36,6 +36,11 @@ interface SearchIndex
     public function query(): Builder;
 
     /**
+     * How many documents the index should hold, for the health check (a cheap count, not a scan).
+     */
+    public function expectedCount(): int;
+
+    /**
      * The same query answered from the database, used when the engine is `database` or has failed.
      */
     public function fallback(SearchQuery $query): SearchResult;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Filagora\Search\Engines;
 
 use Filagora\Search\Contracts\SearchEngine;
+use Filagora\Search\Contracts\WaitsForTasks;
 use Filagora\Search\Engines\Meilisearch\FilterCompiler;
 use Filagora\Search\Enums\Capability;
 use Filagora\Search\Exceptions\MeilisearchTaskFailed;
@@ -25,7 +26,7 @@ use InvalidArgumentException;
  * (tests and reindex use it; ordinary indexing does not need to). Every word of a search must
  * match, and a result total that reaches Meilisearch's counting limit is marked as capped.
  */
-class MeilisearchEngine implements SearchEngine
+class MeilisearchEngine implements SearchEngine, WaitsForTasks
 {
     /** @var list<int> */
     private array $pendingTasks = [];
@@ -89,6 +90,19 @@ class MeilisearchEngine implements SearchEngine
 
         if ($payload !== []) {
             $this->pendingTasks[] = $this->enqueue('post', "/indexes/{$this->uid($index)}/documents?primaryKey={$index->primaryKey}", $payload);
+        }
+    }
+
+    public function update(IndexDefinition $index, iterable $documents): void
+    {
+        $payload = [];
+
+        foreach ($documents as $document) {
+            $payload[] = $this->payload($index, $document);
+        }
+
+        if ($payload !== []) {
+            $this->pendingTasks[] = $this->enqueue('put', "/indexes/{$this->uid($index)}/documents?primaryKey={$index->primaryKey}", $payload);
         }
     }
 

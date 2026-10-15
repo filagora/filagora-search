@@ -47,6 +47,11 @@ class FakeIndex implements SearchIndex
         return TestUser::query();
     }
 
+    public function expectedCount(): int
+    {
+        return TestUser::query()->count();
+    }
+
     public function fallback(SearchQuery $query): SearchResult
     {
         $this->fallbackCalls++;

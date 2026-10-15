@@ -27,7 +27,7 @@ use InvalidArgumentException;
  * engines are held to. Text matching is every word as a case-insensitive substring of some
  * searchable field, ranked by the earliest field it appears in.
  */
-final class ArrayEngine implements SearchEngine
+class ArrayEngine implements SearchEngine
 {
     /** @var array<string, array<string, Document>> */
     private array $documents = [];
@@ -46,6 +46,16 @@ final class ArrayEngine implements SearchEngine
     {
         foreach ($documents as $document) {
             $this->documents[$index->name][(string) $document->id] = $document;
+        }
+    }
+
+    public function update(IndexDefinition $index, iterable $documents): void
+    {
+        foreach ($documents as $document) {
+            $key = (string) $document->id;
+            $existing = $this->documents[$index->name][$key] ?? null;
+
+            $this->documents[$index->name][$key] = new Document($document->id, [...($existing->fields ?? []), ...$document->fields], $document->vectors ?? $existing?->vectors);
         }
     }
 

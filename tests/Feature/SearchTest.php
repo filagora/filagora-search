@@ -39,6 +39,8 @@ class FlakyEngine implements SearchEngine
 
     public function index(IndexDefinition $index, iterable $documents): void {}
 
+    public function update(IndexDefinition $index, iterable $documents): void {}
+
     public function remove(IndexDefinition $index, iterable $ids): void {}
 
     public function flush(IndexDefinition $index): void {}

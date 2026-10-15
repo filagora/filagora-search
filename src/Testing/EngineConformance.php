@@ -155,6 +155,17 @@ final class EngineConformance
                 $settle();
                 EngineConformance::same([], $ids(new SearchQuery(perPage: 50)), 'flushed');
             },
+            'merges partial updates into existing documents and creates missing ones' => function () use ($prepare, $engine, $index, $settle, $sorted, $ids): void {
+                $prepare();
+                $engine->update($index, [
+                    new Document(1, ['price' => 99]),
+                    new Document(8, ['title' => 'Brand new', 'price' => 5]),
+                ]);
+                $settle();
+                EngineConformance::same([1], $ids(new SearchQuery('gateway', filter: new Range('price', gte: 90))), 'merged field changed, others kept');
+                EngineConformance::same([8], $ids(new SearchQuery('brand')), 'created');
+                EngineConformance::same([1, 2, 3, 4, 5, 6, 8], $sorted($ids(new SearchQuery(perPage: 50))), 'nothing else changed');
+            },
             'reports how many documents it holds, or nothing at all' => function () use ($prepare, $engine, $index): void {
                 $prepare();
                 $stats = $engine->stats($index);
