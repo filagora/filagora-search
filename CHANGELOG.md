@@ -5,6 +5,10 @@ All notable changes to this package are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-16
+
+First release.
+
 ### Added
 - Keeping the index fresh: every save, delete and restore of a model that belongs to a registered index queues a `SyncSearchDocument` (on the `sync` connection unless `queue` is on, after the transaction commits unless `after_commit` is off). A failing engine is logged and never breaks the save. The `database` engine does nothing.
 - `Indexer`: `sync`, `forget`, `reindex` (resume with a start key, batch size, limit, pause, progress) and `backfill` of one field group.

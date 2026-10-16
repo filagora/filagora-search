@@ -4,7 +4,7 @@ Search for Filagora that does not tie you to one engine. It defines a `SearchEng
 a portable filter tree, ships a Meilisearch engine and a database fallback, and keeps the index
 fresh and healthy with commands. Requires [`filagora/filagora-core`](https://github.com/filagora/filagora-core).
 
-> In progress, unreleased. The package is at `0.1`: the API may change between `0.x` minor
+> The package is at `0.1`: the API may change between `0.x` minor
 > versions. There is no frontend: you build the search pages.
 
 ## How it fits together
@@ -63,7 +63,13 @@ foreach (EngineConformance::checks($engine, fn () => $engine->waitForTasks()) as
 
 ## Install
 
-Not yet released.
+```bash
+composer require filagora/filagora-search
+```
+
+Nothing to migrate: the package owns no tables. It uses the `database` engine until you set
+`FILAGORA_SEARCH_ENGINE`. Packages that have searchable things (forums, cms) register their own
+indexes when this package is installed.
 
 ## Testing
 
