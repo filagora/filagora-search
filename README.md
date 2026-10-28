@@ -46,7 +46,9 @@ MEILISEARCH_KEY=your-key
 
 The engine speaks Meilisearch's HTTP API directly. Changes are applied by Meilisearch after it
 has answered, so a failure shows up as a failed *task*; `syncSettings()` waits for its own tasks and
-`MeilisearchEngine::waitForTasks()` waits for the rest. Every word of a query must match, and a
+`MeilisearchEngine::waitForTasks()` waits for the rest. Every word of a query must match unless the query asks for `MatchingStrategy::Last`, which
+Meilisearch answers by dropping words from the end until something matches (other engines still
+require every word); a
 total that reaches `meilisearch.max_total_hits` (1000, Meilisearch's counting limit) is reported with
 `totalIsCapped`.
 

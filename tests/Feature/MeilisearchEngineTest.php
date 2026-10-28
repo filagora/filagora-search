@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Filagora\Search\Engines\MeilisearchEngine;
+use Filagora\Search\Enums\MatchingStrategy;
 use Filagora\Search\Enums\SortDirection;
 use Filagora\Search\Exceptions\MeilisearchTaskFailed;
 use Filagora\Search\Filters\Any;
@@ -227,4 +228,16 @@ it('counts indexing tasks that failed recently', function () {
 
     expect(fn () => $engine->waitForTasks())->toThrow(MeilisearchTaskFailed::class)
         ->and($engine->stats($index)?->recentFailures)->toBe(1);
+});
+
+it('finds documents matching only the first words of a query when asked to drop trailing words', function () {
+    $engine = meilisearch('last_');
+    $index = new IndexDefinition('strategy', ['title']);
+    $engine->syncSettings($index);
+    $engine->flush($index);
+    $engine->index($index, [new Document(1, ['title' => 'zen cart guide']), new Document(2, ['title' => 'other'])]);
+    $engine->waitForTasks();
+
+    expect($engine->search($index, new SearchQuery('zen cart 1.5.8'))->ids())->toBe([])
+        ->and($engine->search($index, new SearchQuery('zen cart 1.5.8', matching: MatchingStrategy::Last))->ids())->toBe([1]);
 });
