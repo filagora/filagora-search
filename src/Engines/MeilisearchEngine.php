@@ -126,7 +126,7 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
             'q' => $query->text,
             'page' => $query->page,
             'hitsPerPage' => $query->perPage,
-            'matchingStrategy' => 'all',
+            'matchingStrategy' => $query->matching->value,
             'showRankingScore' => true,
         ];
 

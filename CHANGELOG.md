@@ -5,6 +5,11 @@ All notable changes to this package are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-28
+
+### Added
+- `MatchingStrategy` and `SearchQuery::$matching`: `All` (the default, every word must match) or `Last`, which lets Meilisearch drop words from the end of the query until something matches. Other engines treat `Last` as `All`.
+
 ## [0.1.0] - 2026-10-16
 
 First release.
