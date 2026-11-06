@@ -14,6 +14,7 @@ use Filagora\Search\Support\SearchEngines;
 use Filagora\Search\Support\SearchIndexRegistry;
 use Filagora\Search\Support\SearchQuery;
 use Filagora\Search\Tests\Support\BatchedUserIndex;
+use Filagora\Search\Tests\Support\ExplicitUserIndex;
 use Filagora\Search\Tests\Support\TestUser;
 use Filagora\Search\Tests\Support\UserIndex;
 use Illuminate\Database\Eloquent\Model;
@@ -331,4 +332,18 @@ it('does not batch a partial update', function () {
     app(Indexer::class)->backfill($index, 'contact');
 
     expect($index->batchSizes)->toBe([]);
+});
+
+it('leaves an index that is synced explicitly alone when a row is saved', function () {
+    Queue::fake();
+    app(SearchIndexRegistry::class)->register(new ExplicitUserIndex);
+    app(SearchEngines::class)->extend('array', fn () => new ArrayEngine);
+    config(['filagora-search.engine' => 'array']);
+
+    $user = TestUser::make('Alice');
+    $user->update(['name' => 'Alicia']);
+
+    Queue::assertNothingPushed();
+
+    app(Indexer::class)->reindex(new ExplicitUserIndex);
 });

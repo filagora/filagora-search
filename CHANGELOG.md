@@ -5,6 +5,11 @@ All notable changes to this package are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-06
+
+### Added
+- `SyncedExplicitly`: an index filled only by a run someone starts (an ingest, a backfill) is left alone by `ModelSync`, so saving one of its rows queues no sync and makes no embedding call. It can still be searched and have its settings applied.
+
 ## [0.2.1] - 2026-11-06
 
 ### Changed
