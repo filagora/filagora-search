@@ -176,12 +176,15 @@ it('reindexes every searchable row in batches, reporting progress', function () 
     TestUser::make('Hidden', 'hidden@example.test');
     $engine->flush((new UserIndex)->definition());
     $steps = [];
+    $lastKeys = [];
 
-    $sent = app(Indexer::class)->reindex(new UserIndex, batchSize: 2, progress: function (int $sent) use (&$steps) {
+    $sent = app(Indexer::class)->reindex(new UserIndex, batchSize: 2, progress: function (int $sent, int|string|null $lastKey) use (&$steps, &$lastKeys) {
         $steps[] = $sent;
+        $lastKeys[] = $lastKey;
     });
 
-    expect($sent)->toBe(5)->and($steps)->toBe([2, 4, 5])->and(indexed($engine))->toBe($users->pluck('id')->all());
+    expect($sent)->toBe(5)->and($steps)->toBe([2, 4, 5])->and(indexed($engine))->toBe($users->pluck('id')->all())
+        ->and($lastKeys[0])->toBe($users[1]->id)->and($lastKeys[1])->toBe($users[3]->id)->and(count($lastKeys))->toBe(3);
 });
 
 it('resumes a reindex at a key and stops at a limit', function () {

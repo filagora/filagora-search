@@ -5,6 +5,9 @@ All notable changes to this package are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- The `$progress` callback of `Indexer::reindex()` and `backfill()` is also given the last key it has looked at, so an interrupted run can be resumed from the next key.
+
 ## [0.2.0] - 2026-11-06
 
 ### Added

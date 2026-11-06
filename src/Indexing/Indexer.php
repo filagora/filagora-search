@@ -64,9 +64,10 @@ class Indexer
     /**
      * Send every searchable row of the index, in key order, `$batchSize` at a time. `$fromId`
      * resumes at a key, `$limit` stops after that many rows have been looked at, `$progress` is
-     * told the running total after each batch. Returns how many documents were sent.
+     * told the running total and the last key it has looked at after each batch, so an interrupted run
+     * can be resumed from the next key. Returns how many documents were sent.
      *
-     * @param  Closure(int): void|null  $progress
+     * @param  Closure(int, int|string|null): void|null  $progress
      */
     public function reindex(SearchIndex $index, int|string|null $fromId = null, int $batchSize = 500, ?int $limit = null, int $sleepMs = 0, ?Closure $progress = null): int
     {
@@ -76,7 +77,7 @@ class Indexer
     /**
      * Send only one group of fields of every searchable row, as partial updates.
      *
-     * @param  Closure(int): void|null  $progress
+     * @param  Closure(int, int|string|null): void|null  $progress
      */
     public function backfill(GroupedSearchIndex $index, string $group, int|string|null $fromId = null, int $batchSize = 500, ?int $limit = null, int $sleepMs = 0, ?Closure $progress = null): int
     {
@@ -89,7 +90,7 @@ class Indexer
 
     /**
      * @param  Closure(Model): Document  $toDocument
-     * @param  Closure(int): void|null  $progress
+     * @param  Closure(int, int|string|null): void|null  $progress
      */
     private function send(SearchIndex $index, int|string|null $fromId, int $batchSize, ?int $limit, int $sleepMs, ?Closure $progress, Closure $toDocument, bool $partial): int
     {
@@ -102,6 +103,7 @@ class Indexer
         }
 
         $query->chunkById(max(1, $batchSize), function ($models) use ($index, $limit, $sleepMs, $progress, $toDocument, $partial, &$sent, &$seen): bool {
+            $lastKey = null;
             $searchable = [];
 
             foreach ($models as $model) {
@@ -110,6 +112,7 @@ class Indexer
                 }
 
                 $seen++;
+                $lastKey = $model->getKey();
 
                 if ($index->shouldBeSearchable($model)) {
                     $searchable[] = $model;
@@ -128,7 +131,7 @@ class Indexer
             }
 
             if ($progress !== null) {
-                $progress($sent);
+                $progress($sent, $lastKey);
             }
 
             if ($sleepMs > 0) {
