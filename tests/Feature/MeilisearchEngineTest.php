@@ -56,6 +56,10 @@ foreach (EngineConformance::checks($engine, $engine->waitForTasks(...)) as $name
     it("conforms: {$name}", $check);
 }
 
+foreach (EngineConformance::vectorChecks($engine, $engine->waitForTasks(...)) as $name => $check) {
+    it("conforms: {$name}", $check);
+}
+
 it('creates the index with its settings and reports its stats', function () {
     $uid = 'things_'.uniqid();
     $engine = meilisearch('stats_');
@@ -205,6 +209,33 @@ it('sends a document\'s vectors under the default embedder', function () {
         ['title' => 'x', 'id' => 1, '_vectors' => ['default' => [0.1, 0.2]]],
         ['title' => 'y', 'id' => 2],
     ]);
+});
+
+it('marks which documents of a vector index have a vector, and opts the others out of the embedder', function () {
+    Http::fake(['*' => Http::response(['taskUid' => 5], 202)]);
+    $index = EngineConformance::vectorDefinition();
+
+    meilisearch()->index($index, [new Document(1, ['title' => 'x'], [0.1, 0.2, 0.3]), new Document(2, ['title' => 'y'])]);
+    meilisearch()->update($index, [new Document(3, ['title' => 'z'])]);
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST' && str_contains($request->url(), '/documents') && $request->data() === [
+        ['title' => 'x', 'id' => 1, '_vectors' => ['default' => [0.1, 0.2, 0.3]], '_has_vector' => true],
+        ['title' => 'y', 'id' => 2, '_vectors' => ['default' => null], '_has_vector' => false],
+    ]);
+    Http::assertSent(fn ($request) => $request->method() === 'PUT' && $request->data() === [['title' => 'z', 'id' => 3]]);
+});
+
+it('declares the embedder only on an index with vectors', function () {
+    Http::fake(['*/indexes/*/settings' => Http::response(['taskUid' => 5], 202), '*/tasks/*' => Http::response(['status' => 'succeeded']), '*' => Http::response([], 200)]);
+
+    meilisearch()->syncSettings(EngineConformance::vectorDefinition());
+    meilisearch()->syncSettings(EngineConformance::definition());
+
+    $settings = Http::recorded(fn ($request) => $request->method() === 'PATCH')->map(fn ($pair) => $pair[0]->data())->values();
+
+    expect($settings[0]['embedders'])->toBe(['default' => ['source' => 'userProvided', 'dimensions' => 3]])
+        ->and($settings[0]['filterableAttributes'])->toContain('_has_vector')
+        ->and($settings[1])->not->toHaveKey('embedders');
 });
 
 it('waits for each change only once', function () {

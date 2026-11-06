@@ -12,7 +12,7 @@ final readonly class Document
 {
     /**
      * @param  array<string, scalar|list<scalar>|null>  $fields
-     * @param  list<float>|null  $vectors  Reserved for engines that support vectors.
+     * @param  list<float>|null  $vectors  The document's embedding, for an index with `vectorDimensions`.
      */
     public function __construct(public int|string $id, public array $fields, public ?array $vectors = null) {}
 }

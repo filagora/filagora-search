@@ -76,12 +76,18 @@ class ArrayEngine implements SearchEngine
         $words = preg_split('/\s+/', mb_strtolower(trim($query->text)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $scored = [];
 
+        if ($query->vector !== null) {
+            $this->assertVectorSearchable($index, $query->vector);
+        }
+
         foreach ($this->documents[$index->name] ?? [] as $document) {
             if ($query->filter !== null && ! $this->matches($query->filter, $document)) {
                 continue;
             }
 
-            $score = $this->score($index, $document, $words);
+            $score = $query->vector !== null
+                ? $this->vectorScore($index, $document, $words, $query)
+                : $this->score($index, $document, $words);
 
             if ($score !== null) {
                 $scored[] = [$document, $score];
@@ -105,7 +111,52 @@ class ArrayEngine implements SearchEngine
 
     public function capabilities(): array
     {
-        return [Capability::SORT, Capability::RANGE_FILTER, Capability::MULTI_VALUE_FILTER];
+        return [Capability::SORT, Capability::RANGE_FILTER, Capability::MULTI_VALUE_FILTER, Capability::VECTORS];
+    }
+
+    /**
+     * By similarity of meaning: cosine similarity to the query vector, for the documents that have a
+     * vector. Words, when given with a ratio below one, still have to match, as in a keyword search;
+     * with a ratio of one they are ignored, as Meilisearch ignores them.
+     *
+     * @param  list<string>  $words
+     */
+    private function vectorScore(IndexDefinition $index, Document $document, array $words, SearchQuery $query): ?float
+    {
+        if ($document->vectors === null || $query->vector === null) {
+            return null;
+        }
+
+        if ($words !== [] && $query->semanticRatio < 1.0 && $this->score($index, $document, $words) === null) {
+            return null;
+        }
+
+        $dot = 0.0;
+        $left = 0.0;
+        $right = 0.0;
+
+        foreach ($query->vector as $position => $value) {
+            $other = (float) ($document->vectors[$position] ?? 0.0);
+            $dot += $value * $other;
+            $left += $value * $value;
+            $right += $other * $other;
+        }
+
+        return $left > 0.0 && $right > 0.0 ? $dot / (sqrt($left) * sqrt($right)) : 0.0;
+    }
+
+    /**
+     * @param  list<float>  $vector
+     */
+    private function assertVectorSearchable(IndexDefinition $index, array $vector): void
+    {
+        if ($index->vectorDimensions === null) {
+            throw new InvalidArgumentException("The [{$index->name}] index has no vectors, so it cannot be searched by meaning.");
+        }
+
+        if (count($vector) !== $index->vectorDimensions) {
+            throw new InvalidArgumentException('The query vector has '.count($vector)." dimensions; the [{$index->name}] index has {$index->vectorDimensions}.");
+        }
     }
 
     /**

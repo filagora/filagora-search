@@ -44,6 +44,80 @@ final class EngineConformance
         );
     }
 
+    public const VECTOR_INDEX = 'conformance_vectors';
+
+    /**
+     * An index of three-dimensional vectors, for engines that can search by meaning.
+     */
+    public static function vectorDefinition(): IndexDefinition
+    {
+        return new IndexDefinition(
+            name: self::VECTOR_INDEX,
+            searchable: ['title'],
+            filterable: ['kind'],
+            vectorDimensions: 3,
+        );
+    }
+
+    /**
+     * What an engine with the VECTORS capability must also do. Run these in addition to `checks()`,
+     * and only for such an engine.
+     *
+     * @return array<string, Closure(): void>
+     */
+    public static function vectorChecks(SearchEngine $engine, ?Closure $settle = null): array
+    {
+        $settle ??= static function (): void {};
+        $index = self::vectorDefinition();
+
+        $prepare = function () use ($engine, $index, $settle): void {
+            $engine->syncSettings($index);
+            $engine->flush($index);
+            $engine->index($index, [
+                new Document(1, ['title' => 'north', 'kind' => 'a'], [1.0, 0.0, 0.0]),
+                new Document(2, ['title' => 'north east', 'kind' => 'b'], [0.9, 0.4, 0.0]),
+                new Document(3, ['title' => 'east', 'kind' => 'a'], [0.0, 1.0, 0.0]),
+                new Document(4, ['title' => 'no vector', 'kind' => 'a']),
+            ]);
+            $settle();
+        };
+
+        $ids = static fn (SearchQuery $query): array => array_map('intval', $engine->search($index, $query)->ids());
+
+        return [
+            'ranks documents by closeness to the query vector' => function () use ($prepare, $ids): void {
+                $prepare();
+                $found = $ids(new SearchQuery(vector: [1.0, 0.0, 0.0], perPage: 3));
+
+                EngineConformance::same([1, 2, 3], $found, 'ids in order of similarity');
+                EngineConformance::same([3, 2, 1], $ids(new SearchQuery(vector: [0.0, 1.0, 0.0], perPage: 3)), 'the other way round');
+            },
+            'never returns a document that has no vector for a vector query' => function () use ($prepare, $ids): void {
+                $prepare();
+
+                EngineConformance::same(false, in_array(4, $ids(new SearchQuery(vector: [1.0, 0.0, 0.0], perPage: 10)), true), 'document without a vector');
+            },
+            'narrows a vector query with a filter' => function () use ($prepare, $ids): void {
+                $prepare();
+
+                EngineConformance::same([1, 3], $ids(new SearchQuery(filter: new Equals('kind', 'a'), vector: [1.0, 0.0, 0.0], perPage: 10)), 'only kind a');
+            },
+            'keeps a stored vector when a partial update leaves it out' => function () use ($prepare, $engine, $index, $settle, $ids): void {
+                $prepare();
+                $engine->update($index, [new Document(1, ['kind' => 'b'])]);
+                $settle();
+
+                EngineConformance::same([1, 2], $ids(new SearchQuery(filter: new Equals('kind', 'b'), vector: [1.0, 0.0, 0.0], perPage: 10)), 'the field changed and the vector stayed');
+            },
+            'refuses a vector of the wrong length, and a vector query on an index without vectors' => function () use ($prepare, $engine, $index): void {
+                $prepare();
+
+                EngineConformance::throws(fn () => $engine->search($index, new SearchQuery(vector: [1.0, 0.0])), 'a vector of the wrong length');
+                EngineConformance::throws(fn () => $engine->search(EngineConformance::definition(), new SearchQuery(vector: [1.0, 0.0, 0.0])), 'an index with no vectors');
+            },
+        ];
+    }
+
     /**
      * @return array<string, Closure(): void>
      */
@@ -187,6 +261,20 @@ final class EngineConformance
             new Document(5, ['title' => 'Backup', 'body' => 'Database', 'kind' => 'plugin', 'tags' => ['ops'], 'price' => 50, 'active' => false]),
             new Document(6, ['title' => 'Docs', 'body' => 'Manual', 'kind' => 'theme', 'tags' => ['ops'], 'price' => 60, 'active' => false]),
         ];
+    }
+
+    /**
+     * @param  Closure(): mixed  $call
+     */
+    public static function throws(Closure $call, string $what): void
+    {
+        try {
+            $call();
+        } catch (\InvalidArgumentException) {
+            return;
+        }
+
+        throw new ConformanceFailure("{$what}: expected the engine to refuse it, but it answered.");
     }
 
     public static function same(mixed $expected, mixed $actual, string $what): void
