@@ -13,6 +13,7 @@ use Filagora\Search\Support\IndexStats;
 use Filagora\Search\Support\SearchEngines;
 use Filagora\Search\Support\SearchIndexRegistry;
 use Filagora\Search\Support\SearchQuery;
+use Filagora\Search\Tests\Support\BatchedUserIndex;
 use Filagora\Search\Tests\Support\TestUser;
 use Filagora\Search\Tests\Support\UserIndex;
 use Illuminate\Database\Eloquent\Model;
@@ -296,4 +297,35 @@ it('applies the settings first when reindexing with --sync-settings', function (
 
     $this->artisan('filagora:search:reindex', ['--sync-settings' => true])->assertExitCode(0);
     expect($calls)->toBe(['settings']);
+});
+
+it('asks an index that batches for a whole chunk of documents at once, and only the searchable rows', function () {
+    $engine = new ArrayEngine;
+    $index = new BatchedUserIndex;
+    app(SearchIndexRegistry::class)->register($index);
+    app(SearchEngines::class)->extend('array', fn () => $engine);
+    config(['filagora-search.engine' => 'array']);
+    $engine->syncSettings($index->definition());
+    $users = [TestUser::make('A'), TestUser::make('B'), TestUser::make('C')];
+    TestUser::make('Hidden', 'hidden1@example.test');
+
+    $sent = app(Indexer::class)->reindex($index, batchSize: 2);
+
+    expect($sent)->toBe(3)
+        ->and($index->batchSizes)->toBe([2, 1])
+        ->and($engine->search($index->definition(), new SearchQuery(vector: [1.0, 0.0], perPage: 10))->ids())->toHaveCount(3);
+});
+
+it('does not batch a partial update', function () {
+    $index = new BatchedUserIndex;
+    $engine = new ArrayEngine;
+    app(SearchIndexRegistry::class)->register($index);
+    app(SearchEngines::class)->extend('array', fn () => $engine);
+    config(['filagora-search.engine' => 'array']);
+    $engine->syncSettings($index->definition());
+    TestUser::make('A');
+
+    app(Indexer::class)->backfill($index, 'contact');
+
+    expect($index->batchSizes)->toBe([]);
 });

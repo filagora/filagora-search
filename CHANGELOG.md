@@ -5,6 +5,10 @@ All notable changes to this package are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Search by meaning.** `IndexDefinition::$vectorDimensions` makes an index one whose documents carry vectors (made by the caller; this package never calls an embedding service). A `SearchQuery` with a `vector` (and, if it has words too, a `semanticRatio` between 0 and 1) finds the closest documents. Meilisearch declares a user-provided embedder only on such an index, marks which documents have a vector, opts the others out of the embedder (so a later settings update cannot fail on a document with no vector) and never returns a document without one for a vector query; a partial update leaves a stored vector alone. The array engine ranks by cosine similarity. Both report the `VECTORS` capability, and `EngineConformance::vectorChecks()` holds an engine to it. A vector of the wrong length, or a vector query on an index without vectors, is refused.
+- `BatchesDocuments`: an index that makes the documents of a whole chunk at once (one embedding call per chunk instead of one per row). A full reindex uses it; a saved row still goes through `toDocument()`.
+
 ## [0.1.1] - 2026-10-28
 
 ### Added

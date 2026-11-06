@@ -225,3 +225,8 @@ it('replaces an engine registered again under the same name', function () {
     $engines->extend('mine', fn () => $second);
     expect($engines->engine('mine'))->toBe($second);
 });
+
+it('refuses a semantic ratio outside zero to one', function () {
+    expect(fn () => new SearchQuery(vector: [1.0], semanticRatio: 1.5))->toThrow(InvalidArgumentException::class, 'semantic ratio')
+        ->and(fn () => new SearchQuery(vector: [1.0], semanticRatio: -0.1))->toThrow(InvalidArgumentException::class);
+});

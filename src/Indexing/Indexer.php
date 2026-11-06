@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Filagora\Search\Indexing;
 
 use Closure;
+use Filagora\Search\Contracts\BatchesDocuments;
 use Filagora\Search\Contracts\GroupedSearchIndex;
 use Filagora\Search\Contracts\SearchEngine;
 use Filagora\Search\Contracts\SearchIndex;
@@ -12,6 +13,7 @@ use Filagora\Search\Contracts\WaitsForTasks;
 use Filagora\Search\Engines\DatabaseEngine;
 use Filagora\Search\Support\Document;
 use Filagora\Search\Support\SearchEngines;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
@@ -100,7 +102,7 @@ class Indexer
         }
 
         $query->chunkById(max(1, $batchSize), function ($models) use ($index, $limit, $sleepMs, $progress, $toDocument, $partial, &$sent, &$seen): bool {
-            $documents = [];
+            $searchable = [];
 
             foreach ($models as $model) {
                 if ($limit !== null && $seen >= $limit) {
@@ -110,9 +112,13 @@ class Indexer
                 $seen++;
 
                 if ($index->shouldBeSearchable($model)) {
-                    $documents[] = $toDocument($model);
+                    $searchable[] = $model;
                 }
             }
+
+            $documents = ! $partial && $index instanceof BatchesDocuments && $searchable !== []
+                ? $index->toDocuments(new EloquentCollection($searchable))
+                : array_map($toDocument, $searchable);
 
             if ($documents !== []) {
                 $partial

@@ -6,7 +6,9 @@ namespace Filagora\Search\Support;
 
 /**
  * What an index holds and how it may be queried. `searchable` is ordered: a match in an earlier
- * field ranks above one in a later field.
+ * field ranks above one in a later field. `vectorDimensions` makes the index one that can be
+ * searched by meaning: its documents carry vectors of that length, supplied by the caller (this
+ * package never makes embeddings), and a query may carry one to compare them with.
  */
 final readonly class IndexDefinition
 {
@@ -23,5 +25,6 @@ final readonly class IndexDefinition
         public array $sortable = [],
         public array $synonyms = [],
         public string $primaryKey = 'id',
+        public ?int $vectorDimensions = null,
     ) {}
 }

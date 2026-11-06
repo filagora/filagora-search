@@ -28,6 +28,9 @@ use InvalidArgumentException;
  */
 class MeilisearchEngine implements SearchEngine, WaitsForTasks
 {
+    /** The field a vector index keeps to say which documents have a vector. */
+    private const HAS_VECTOR = '_has_vector';
+
     /** @var list<int> */
     private array $pendingTasks = [];
 
@@ -71,13 +74,21 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
             $this->waitForTask($this->enqueue('post', '/indexes', ['uid' => $uid, 'primaryKey' => $index->primaryKey]));
         }
 
-        $this->waitForTask($this->enqueue('patch', "/indexes/{$uid}/settings", [
+        $settings = [
             'searchableAttributes' => $index->searchable,
-            'filterableAttributes' => $index->filterable,
+            'filterableAttributes' => $index->vectorDimensions !== null ? [...$index->filterable, self::HAS_VECTOR] : $index->filterable,
             'sortableAttributes' => $index->sortable,
             'synonyms' => (object) $index->synonyms,
             'pagination' => ['maxTotalHits' => $this->maxTotalHits],
-        ]));
+        ];
+
+        // Only a vector index declares an embedder; the others never mention one, so an engine that
+        // has the feature switched off is not asked about it.
+        if ($index->vectorDimensions !== null) {
+            $settings['embedders'] = ['default' => ['source' => 'userProvided', 'dimensions' => $index->vectorDimensions]];
+        }
+
+        $this->waitForTask($this->enqueue('patch', "/indexes/{$uid}/settings", $settings));
     }
 
     public function index(IndexDefinition $index, iterable $documents): void
@@ -85,7 +96,7 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
         $payload = [];
 
         foreach ($documents as $document) {
-            $payload[] = $this->payload($index, $document);
+            $payload[] = $this->payload($index, $document, true);
         }
 
         if ($payload !== []) {
@@ -98,7 +109,7 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
         $payload = [];
 
         foreach ($documents as $document) {
-            $payload[] = $this->payload($index, $document);
+            $payload[] = $this->payload($index, $document, false);
         }
 
         if ($payload !== []) {
@@ -122,6 +133,10 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
 
     public function search(IndexDefinition $index, SearchQuery $query): SearchResult
     {
+        if ($query->vector !== null) {
+            $this->assertVectorSearchable($index, $query->vector);
+        }
+
         $options = [
             'q' => $query->text,
             'page' => $query->page,
@@ -129,6 +144,11 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
             'matchingStrategy' => $query->matching->value,
             'showRankingScore' => true,
         ];
+
+        if ($query->vector !== null) {
+            $options['vector'] = $query->vector;
+            $options['hybrid'] = ['semanticRatio' => $query->semanticRatio, 'embedder' => 'default'];
+        }
 
         if ($query->filter !== null) {
             $filter = $this->filters->compile($query->filter, $index);
@@ -140,6 +160,14 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
             if ($filter !== true) {
                 $options['filter'] = $filter;
             }
+        }
+
+        // A search by meaning must not return documents that have no vector: Meilisearch would list
+        // them after the ones that do, as plain keyword matches.
+        if ($query->vector !== null) {
+            $options['filter'] = isset($options['filter'])
+                ? '('.$options['filter'].') AND '.self::HAS_VECTOR.' = true'
+                : self::HAS_VECTOR.' = true';
         }
 
         if ($query->sort !== []) {
@@ -187,7 +215,7 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
 
     public function capabilities(): array
     {
-        return [Capability::SORT, Capability::RANGE_FILTER, Capability::MULTI_VALUE_FILTER, Capability::SYNONYMS];
+        return [Capability::SORT, Capability::RANGE_FILTER, Capability::MULTI_VALUE_FILTER, Capability::SYNONYMS, Capability::VECTORS];
     }
 
     /**
@@ -240,15 +268,38 @@ class MeilisearchEngine implements SearchEngine, WaitsForTasks
     /**
      * @return array<string, mixed>
      */
-    private function payload(IndexDefinition $index, Document $document): array
+    private function payload(IndexDefinition $index, Document $document, bool $replacing): array
     {
         $payload = [...$document->fields, $index->primaryKey => $document->id];
 
         if ($document->vectors !== null) {
             $payload['_vectors'] = ['default' => $document->vectors];
+
+            if ($index->vectorDimensions !== null) {
+                $payload[self::HAS_VECTOR] = true;
+            }
+        } elseif ($index->vectorDimensions !== null && $replacing) {
+            // A document with no vector on an index that has an embedder must say so, or Meilisearch
+            // fails every later settings update on the index. A partial update leaves its vector alone.
+            $payload['_vectors'] = ['default' => null];
+            $payload[self::HAS_VECTOR] = false;
         }
 
         return $payload;
+    }
+
+    /**
+     * @param  list<float>  $vector
+     */
+    private function assertVectorSearchable(IndexDefinition $index, array $vector): void
+    {
+        if ($index->vectorDimensions === null) {
+            throw new InvalidArgumentException("The [{$index->name}] index has no vectors, so it cannot be searched by meaning.");
+        }
+
+        if (count($vector) !== $index->vectorDimensions) {
+            throw new InvalidArgumentException('The query vector has '.count($vector)." dimensions; the [{$index->name}] index has {$index->vectorDimensions}.");
+        }
     }
 
     private function uid(IndexDefinition $index): string
