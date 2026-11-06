@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Filagora\Search\Indexing;
 
+use Filagora\Search\Contracts\SyncedExplicitly;
 use Filagora\Search\Jobs\SyncSearchDocument;
 use Filagora\Search\Support\SearchIndexRegistry;
 use Illuminate\Database\Eloquent\Model;
@@ -29,7 +30,7 @@ final class ModelSync
         }
 
         foreach ($this->indexes->all() as $name => $index) {
-            if (! $model instanceof ($index->model())) {
+            if ($index instanceof SyncedExplicitly || ! $model instanceof ($index->model())) {
                 continue;
             }
 
