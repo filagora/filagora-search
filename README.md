@@ -9,7 +9,34 @@ fresh and healthy with commands. Requires [`filagora/filagora-core`](https://git
 
 ## What it provides
 
-### How it fits together
+### Overview
+
+Engine-agnostic search for Filagora: a SearchEngine contract, Meilisearch and database engines, indexing and health commands.
+
+### Tables
+
+This package adds no tables of its own.
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `filagora:search:backfill` | Send one group of fields of every searchable row to the engine as a partial update. |
+| `filagora:search:check-health {--index=*}` | Compare each search index with its expected document count and look for failed indexing tasks. |
+| `filagora:search:reindex` | Send every searchable row of the search indexes to the engine. |
+| `filagora:search:sync-settings {--index=*}` | Apply the search index settings to the engine. |
+
+### Events
+
+This package fires no events.
+
+### Access
+
+This package defines no abilities.
+
+### Using it
+
+#### How it fits together
 
 - A package (or your app) registers a **`SearchIndex`**: one kind of thing, how a model becomes a
   `Document`, and a `fallback()` that answers the same query from the database.
@@ -21,7 +48,7 @@ fresh and healthy with commands. Requires [`filagora/filagora-core`](https://git
   database for `circuit.cooldown_seconds` and the failure is logged.
 - **Filters** are engine-neutral: `new All(new Equals('forum_id', 3), new Range('reply_count', gte: 2))`.
 
-### Keeping the index fresh
+#### Keeping the index fresh
 
 Saving, deleting or restoring a model that belongs to a registered index updates its document
 (after the transaction commits). Set `FILAGORA_SEARCH_QUEUE=true` to do that on the queue. Failures
@@ -38,7 +65,7 @@ php artisan filagora:search:check-health             # counts and failed tasks; 
 `filagora:doctor` also reports the engine's health. With the `database` engine all of these say
 there is nothing to do.
 
-### Using Meilisearch
+#### Using Meilisearch
 
 ```env
 FILAGORA_SEARCH_ENGINE=meilisearch
@@ -54,7 +81,7 @@ require every word); a
 total that reaches `meilisearch.max_total_hits` (1000, Meilisearch's counting limit) is reported with
 `totalIsCapped`.
 
-### Writing an engine
+#### Writing an engine
 
 Implement `Filagora\Search\Contracts\SearchEngine`, register it, and run the conformance checks in
 your tests. If your engine applies writes later, pass a closure that waits until it has caught up:
