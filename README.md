@@ -7,7 +7,9 @@ fresh and healthy with commands. Requires [`filagora/filagora-core`](https://git
 > The package is at `0.1`: the API may change between `0.x` minor
 > versions. There is no frontend: you build the search pages.
 
-## How it fits together
+## What it provides
+
+### How it fits together
 
 - A package (or your app) registers a **`SearchIndex`**: one kind of thing, how a model becomes a
   `Document`, and a `fallback()` that answers the same query from the database.
@@ -19,7 +21,7 @@ fresh and healthy with commands. Requires [`filagora/filagora-core`](https://git
   database for `circuit.cooldown_seconds` and the failure is logged.
 - **Filters** are engine-neutral: `new All(new Equals('forum_id', 3), new Range('reply_count', gte: 2))`.
 
-## Keeping the index fresh
+### Keeping the index fresh
 
 Saving, deleting or restoring a model that belongs to a registered index updates its document
 (after the transaction commits). Set `FILAGORA_SEARCH_QUEUE=true` to do that on the queue. Failures
@@ -36,7 +38,7 @@ php artisan filagora:search:check-health             # counts and failed tasks; 
 `filagora:doctor` also reports the engine's health. With the `database` engine all of these say
 there is nothing to do.
 
-## Using Meilisearch
+### Using Meilisearch
 
 ```env
 FILAGORA_SEARCH_ENGINE=meilisearch
@@ -52,7 +54,7 @@ require every word); a
 total that reaches `meilisearch.max_total_hits` (1000, Meilisearch's counting limit) is reported with
 `totalIsCapped`.
 
-## Writing an engine
+### Writing an engine
 
 Implement `Filagora\Search\Contracts\SearchEngine`, register it, and run the conformance checks in
 your tests. If your engine applies writes later, pass a closure that waits until it has caught up:
@@ -62,6 +64,10 @@ foreach (EngineConformance::checks($engine, fn () => $engine->waitForTasks()) as
     it("conforms: {$name}", $check);
 }
 ```
+
+## Requirements
+
+PHP 8.4, Laravel 13 and Filament 5. Tested against MariaDB 11.4. Requires [`filagora/filagora-core`](https://github.com/filagora/filagora-core).
 
 ## Install
 
@@ -73,13 +79,30 @@ Nothing to migrate: the package owns no tables. It uses the `database` engine un
 `FILAGORA_SEARCH_ENGINE`. Packages that have searchable things (forums, cms) register their own
 indexes when this package is installed.
 
+## Configuration
+
+`config/filagora-search.php` is merged with the host's copy, so list only what
+differs. Publish it with `php artisan vendor:publish --tag=filagora-search-config`.
+
+## Extending
+
+Extend through documented contracts, events and registries. Anything not documented
+is `@internal`.
+
 ## Testing
 
 ```bash
 composer test
 ```
 
-Tests run against a real MariaDB database named `testing`.
+Tests run against a real MariaDB, never SQLite, so engine behaviour (FULLTEXT,
+`ONLY_FULL_GROUP_BY`, collation) matches production. Host and credentials come from
+your environment; the database is always named `testing`, never your development one.
+
+## Local development (DDEV)
+
+`.ddev/` is included. `ddev start` creates both `db` and `testing` (run `ddev restart` once
+if `testing` is missing), then `ddev exec vendor/bin/pest`.
 
 ## Licence
 
