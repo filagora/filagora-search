@@ -50,6 +50,12 @@ final class ReindexCommand extends Command
         }
 
         foreach ($indexes as $name => $index) {
+            if ($index->definition()->isSwitchedOff()) {
+                $this->info("Index `{$name}`: switched off, left as it is.");
+
+                continue;
+            }
+
             if ($this->option('sync-settings')) {
                 $indexer->engine()->syncSettings($index->definition());
             }

@@ -35,9 +35,8 @@ final class HealthChecker
 
             $definition = $index->definition();
 
-            // Searched by vector only, and no vector length: switched off. Nothing is expected of it,
-            // and what it still holds from before is not a fault.
-            if ($definition->searchable === [] && $definition->vectorDimensions === null) {
+            // What a switched-off index still holds from before is not a fault.
+            if ($definition->isSwitchedOff()) {
                 continue;
             }
 

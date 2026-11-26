@@ -257,6 +257,88 @@ it('expects nothing of a vector-only index while it has no vector length', funct
         ->and(app(HealthChecker::class)->problems(['meaning'])[0])->toContain('holds 1 documents, expected about 0');
 });
 
+function recordingEngine(): ArrayEngine
+{
+    return new class extends ArrayEngine
+    {
+        /** @var list<string> */
+        public array $calls = [];
+
+        public function syncSettings(IndexDefinition $index): void
+        {
+            $this->calls[] = "settings {$index->name}";
+            parent::syncSettings($index);
+        }
+
+        public function flush(IndexDefinition $index): void
+        {
+            $this->calls[] = "flush {$index->name}";
+            parent::flush($index);
+        }
+    };
+}
+
+/**
+ * Users searched by vector only, switched off until `$dimensions` is set.
+ */
+function vectorOnlyIndex(): UserIndex
+{
+    return new class extends UserIndex
+    {
+        public ?int $dimensions = null;
+
+        public function definition(): IndexDefinition
+        {
+            return new IndexDefinition('meaning', [], vectorDimensions: $this->dimensions);
+        }
+    };
+}
+
+it('sends nothing to a switched-off index, and keeps what it holds', function () {
+    $engine = withArrayEngine(recordingEngine());
+    $index = vectorOnlyIndex();
+    $engine->index($index->definition(), [new Document(900, ['kept' => true])]);
+    app(SearchIndexRegistry::class)->register($index);
+    $user = TestUser::make('Hidden away');
+    $user->forceFill(['email' => 'hidden@example.test'])->saveQuietly();
+    $held = fn (): int => $engine->stats($index->definition())->documents;
+
+    app(Indexer::class)->sync($index, TestUser::make('Saved'));
+    app(Indexer::class)->sync($index, $user);
+
+    expect(app(Indexer::class)->reindex($index))->toBe(0)
+        ->and($held())->toBe(1);
+
+    app(Indexer::class)->forget($index, 900);
+
+    expect($held())->toBe(0);
+});
+
+it('leaves a switched-off index alone in the reindex and settings commands', function (string $command, array $options) {
+    $engine = withArrayEngine(recordingEngine());
+    $index = vectorOnlyIndex();
+    app(SearchIndexRegistry::class)->register($index);
+    $engine->index($index->definition(), [new Document(900, ['kept' => true])]);
+    TestUser::make('Counted');
+    $engine->calls = [];
+
+    $this->artisan($command, ['--index' => ['meaning']] + $options)
+        ->expectsOutput('Index `meaning`: switched off, left as it is.')
+        ->assertExitCode(0);
+
+    expect($engine->calls)->toBe([])
+        ->and($engine->stats($index->definition())->documents)->toBe(1);
+
+    $index->dimensions = 3;
+
+    $this->artisan($command, ['--index' => ['meaning']] + $options)->assertExitCode(0);
+
+    expect($engine->calls)->not->toBe([]);
+})->with([
+    'reindex' => ['filagora:search:reindex', ['--flush' => true, '--sync-settings' => true]],
+    'sync settings' => ['filagora:search:sync-settings', []],
+]);
+
 it('reports recent failed tasks as a health problem', function () {
     withArrayEngine();
     $failing = new class extends ArrayEngine

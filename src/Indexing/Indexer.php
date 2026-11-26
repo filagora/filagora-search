@@ -43,7 +43,7 @@ class Indexer
      */
     public function sync(SearchIndex $index, Model $model): void
     {
-        if (! $this->isActive()) {
+        if (! $this->isActive() || $index->definition()->isSwitchedOff()) {
             return;
         }
 
@@ -94,6 +94,11 @@ class Indexer
      */
     private function send(SearchIndex $index, int|string|null $fromId, int $batchSize, ?int $limit, int $sleepMs, ?Closure $progress, Closure $toDocument, bool $partial): int
     {
+        // Before any document is made: making one may mark its row as indexed.
+        if ($index->definition()->isSwitchedOff()) {
+            return 0;
+        }
+
         $query = $index->query();
         $sent = 0;
         $seen = 0;
