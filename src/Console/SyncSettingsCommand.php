@@ -35,6 +35,12 @@ final class SyncSettingsCommand extends Command
         }
 
         foreach ($indexes as $name => $index) {
+            if ($index->definition()->isSwitchedOff()) {
+                $this->info("Index `{$name}`: switched off, left as it is.");
+
+                continue;
+            }
+
             $indexer->engine()->syncSettings($index->definition());
             $this->info("Index `{$name}`: settings applied.");
         }

@@ -63,7 +63,10 @@ php artisan filagora:search:check-health             # counts and failed tasks; 
 ```
 
 An index with no searchable fields is searched by vector only. While it has no vector length (its
-provider is switched off) these checks pass over it, whatever it still holds.
+provider is switched off) it is left as it is: nothing is sent to it, `sync-settings` and `reindex`
+skip it (`--flush` included), and the health check passes over it, whatever it still holds. A row
+that is deleted is still removed from it. When it is switched on again, apply its settings and fill
+it, since rows saved in the meantime were not sent.
 
 `filagora:doctor` also reports the engine's health. With the `database` engine all of these say
 there is nothing to do.
