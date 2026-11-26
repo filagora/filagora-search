@@ -5,6 +5,8 @@ All notable changes to this package are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-11-26
+
 ### Fixed
 
 - A vector-only index with no vector length (embeddings switched off) is now left as it is: saving a row, `filagora:search:reindex` and `filagora:search:backfill` send it nothing, and `filagora:search:sync-settings` and `reindex --flush` neither change its settings nor empty it. Before, a reindex re-sent documents without vectors, which took them out of searches by meaning once embeddings returned, and marked rows as indexed. A deleted row is still removed.
