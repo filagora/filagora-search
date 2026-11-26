@@ -33,7 +33,15 @@ final class HealthChecker
                 continue;
             }
 
-            $stats = $this->engines->engine()->stats($index->definition());
+            $definition = $index->definition();
+
+            // Searched by vector only, and no vector length: switched off. Nothing is expected of it,
+            // and what it still holds from before is not a fault.
+            if ($definition->searchable === [] && $definition->vectorDimensions === null) {
+                continue;
+            }
+
+            $stats = $this->engines->engine()->stats($definition);
 
             if ($stats === null) {
                 $problems[] = "Index `{$name}`: the engine could not report its stats.";

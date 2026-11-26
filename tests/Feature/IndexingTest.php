@@ -229,6 +229,34 @@ it('reports a short or unreachable index as a health problem', function () {
     expect($health->problems()[0])->toContain('could not report its stats');
 });
 
+it('expects nothing of a vector-only index while it has no vector length', function () {
+    $engine = withArrayEngine();
+    config(['filagora-search.health.document_count_tolerance' => 0]);
+    $index = new class extends UserIndex
+    {
+        public ?int $dimensions = null;
+
+        public function definition(): IndexDefinition
+        {
+            return new IndexDefinition('meaning', [], vectorDimensions: $this->dimensions);
+        }
+
+        public function expectedCount(): int
+        {
+            return 0;
+        }
+    };
+    app(SearchIndexRegistry::class)->register($index);
+    $engine->index($index->definition(), [new Document(1, [])]);
+
+    expect(app(HealthChecker::class)->problems(['meaning']))->toBe([]);
+
+    $index->dimensions = 3;
+
+    expect(app(HealthChecker::class)->problems(['meaning']))->toHaveCount(1)
+        ->and(app(HealthChecker::class)->problems(['meaning'])[0])->toContain('holds 1 documents, expected about 0');
+});
+
 it('reports recent failed tasks as a health problem', function () {
     withArrayEngine();
     $failing = new class extends ArrayEngine

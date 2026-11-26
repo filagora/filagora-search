@@ -62,6 +62,9 @@ php artisan filagora:search:backfill threads filters # one field group, as parti
 php artisan filagora:search:check-health             # counts and failed tasks; non-zero on a problem
 ```
 
+An index with no searchable fields is searched by vector only. While it has no vector length (its
+provider is switched off) these checks pass over it, whatever it still holds.
+
 `filagora:doctor` also reports the engine's health. With the `database` engine all of these say
 there is nothing to do.
 

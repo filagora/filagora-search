@@ -5,6 +5,10 @@ All notable changes to this package are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The health check, and so `filagora:doctor`, passes over an index that has no searchable fields and no vector length. A vector-only index whose embeddings were switched off was reported as holding documents where none were expected.
+
 ## [0.2.5] - 2026-11-14
 
 ### Changed
